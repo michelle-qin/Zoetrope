@@ -2,6 +2,8 @@
 #include <SpeedyStepper.h>
 #include <FlexyStepper.h>
 
+  ////// Creating and assigning variables ///////////
+
 #define BEAM_BUTTON_LIGHT 24
 #define BEAM_BUTTON 25
 #define BEAM_LEDS 10
@@ -16,6 +18,9 @@
 #define MOTOR_BUTTON 23
 #define MOTOR_SPEED_POT A0
 #define MOTOR_PORT 1
+
+// be careful when messing with these 4 varibles below because they've been tweaked to work with
+// the current set up. Changing them may result in loss of RPM or unusual noises.
 
 #define MICROSTEPPING 4
 #define TRANSMISSION 5
@@ -183,7 +188,7 @@ void updateStepperMovement() {
   stepper.processMovement();
 }
 
-void filterPotVal() {
+void filterPotVal() {  // allows the limitless potentiometer to work without "overflowing" back to zero
   int newPotVal = analogRead(A0);
 
   if (abs(newPotVal - prevPotVal) > overflowThreshold) {
@@ -198,4 +203,3 @@ void filterPotVal() {
 
   prevPotVal = newPotVal;
 }
-
