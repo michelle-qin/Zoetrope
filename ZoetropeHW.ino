@@ -1,8 +1,19 @@
-#include <Arduino.h>
 #include <SpeedyStepper.h>
+
 #include <FlexyStepper.h>
 
+#include <Arduino.h>
+
+#include <TimerOne.h>
+
   ////// Creating and assigning variables ///////////
+#define TIMER_US 100000
+#define TICK_COUNTS 100
+#define TICK_COUNTS1 300
+
+volatile long tick_count = TICK_COUNTS;
+volatile long tick_count1 = TICK_COUNTS1;
+volatile bool in_long_isr = false;
 
 #define BEAM_BUTTON_LIGHT 24
 #define BEAM_BUTTON 25
@@ -50,6 +61,8 @@ int maxOutputVal = 100;
 int overflowThreshold = 1023 / 2;
 int filterThreshold = 3;
 
+//bool pressButton = false;
+//int timer1_counter;
 
 unsigned long startTime;
 
@@ -58,8 +71,9 @@ FlexyStepper stepper;
 void setup() {
   ////// Pinmode all ports ///////////
 
-  //Serial.begin(9600);
-
+  Serial.begin(9600);
+  Serial.println("[debug] setup()");  //Questions: What is the backlight? I don't know if the timer is starting from the last moment or what. It DOESN'T.
+  
   pinMode(MOTOR_BUTTON_LIGHT, OUTPUT);
   pinMode(MOTOR_BUTTON, INPUT_PULLUP);
   pinMode(MOTOR_SPEED_POT, INPUT_PULLUP);
@@ -86,13 +100,16 @@ void setup() {
 
   ///////// Initialize Lights and Button Lights //////////
 
-  digitalWrite(MOTOR_BUTTON_LIGHT, motorState);
-  digitalWrite(BEAM_BUTTON_LIGHT, beamState);
-  digitalWrite(BEAM_LEDS, beamState);
-  digitalWrite(BACKLIGHT_BUTTON_LIGHT, backlightState);
-  digitalWrite(BACKLIGHT_LEDS, backlightState);
+  digitalWrite(MOTOR_BUTTON_LIGHT, motorState); //sets motor button light to LOW
+  digitalWrite(BEAM_BUTTON_LIGHT, beamState); //sets beam button light to LOW
+  digitalWrite(BEAM_LEDS, beamState); //sets beam LEDs to LOW
+  digitalWrite(BACKLIGHT_BUTTON_LIGHT, backlightState); //sets backlight button lights to LOW
+  digitalWrite(BACKLIGHT_LEDS, backlightState); //sets backlight LEDs to LOW
 
   startTime = millis();
+
+  Timer1.initialize(TIMER_US);
+  Timer1.attachInterrupt(timerIsr);
 }
 
 void loop() {
@@ -101,27 +118,106 @@ void loop() {
   stepper.processMovement();
 
   if (millis() - startTime > 100) {
-    updateBeamState();
+    updateBeamState(); 
     updateBacklightState();
     updateMotorState();
     startTime = millis();
   }
 
+/*
+  if (motorCount == false) {
+    if (pressButton == false) {
+     if (beamState == HIGH && beamCount == true) {
+        delay(5000);
+        turnOffBeam();
+        beamState = LOW;
+        beamCount = false;
+        }
+   }
+  }
+  if (pressButton == false)
+     Serial.println("[debug] pressButton is false");
+  else
+      Serial.println("[debug] pressButton is true");
+  
+  pressButton = false;
+*/
+}
+
+void timerIsr()
+{
+    Serial.println("[debug] timer");
+    
+    if (!(--tick_count))                             // Count to 2S
+    {
+      tick_count = TICK_COUNTS;                      // Reload
+      tick_2s_isr();                                 // Call the 2S routine
+    }
+    
+    if (!(--tick_count1))                             // Count to 2S
+    {
+      tick_count1 = TICK_COUNTS1;                      // Reload
+      tick_3s_isr();                                 // Call the 2S routine
+    }
+}
+
+void tick_2s_isr()
+{
+  Serial.println("[debug] timer 2s");
+  
+  if (in_long_isr)
+      return;
+
+  in_long_isr = true;
+
+  volatile long i;
+
+  interrupts();
+
+  if (motorCount == false) {
+    turnOffBeam();
+    beamState = LOW;
+    beamCount = false;
+  }
+
+  noInterrupts();
+  in_long_isr = false;
+}
+
+void tick_3s_isr()
+{
+  Serial.println("[debug] timer 3s");
+  
+  if (in_long_isr)
+      return;
+
+  in_long_isr = true;
+
+  volatile long i;
+
+  interrupts();
+
+  if (motorCount == true) {
+    turnOffMotor();
+    motorState = LOW;
+    motorCount = false;
+  }
+
+  noInterrupts();
+  in_long_isr = false;
 }
 
 void updateBeamState() {
-  beamState = !digitalRead(BEAM_BUTTON);
+  beamState = !digitalRead(BEAM_BUTTON);  
 
-  if (beamState != lastBeamState && beamState == HIGH) {
-    beamCount = !beamCount;
+  if (beamState != lastBeamState && beamState == HIGH) {   //if beamState is HIGH      //beamState is whether beam button is on or off
+    beamCount = !beamCount;   //make beamCount TRUE
 
-    if (beamCount == false) {
-      digitalWrite(BEAM_BUTTON_LIGHT, LOW);
-      digitalWrite(BEAM_LEDS, LOW);
+    if (beamCount == false) {      //if beamCount is FALSE, make beam button light & LEDs LOW
+      turnOffBeam();
     }
-    else {
-      digitalWrite(BEAM_BUTTON_LIGHT, HIGH);
-      digitalWrite(BEAM_LEDS, HIGH);
+    else {    //if beamCount is TRUE, make beam button light & LEDs HIGH.
+      turnOnBeam();
     }
   }
 
@@ -129,17 +225,28 @@ void updateBeamState() {
   //stepper.processMovement();
 }
 
+void turnOffBeam() {
+      digitalWrite(BEAM_BUTTON_LIGHT, LOW);
+      digitalWrite(BEAM_LEDS, LOW);
+      Serial.println("[debug] updateBeamState() off");
+}
+void turnOnBeam () {
+      digitalWrite(BEAM_BUTTON_LIGHT, HIGH);
+      digitalWrite(BEAM_LEDS, HIGH);
+      Serial.println("[debug] updateBeamState() on");
+}
+
 void updateBacklightState() {
   backlightState = !digitalRead(BACKLIGHT_BUTTON);
 
-  if (backlightState != lastBacklightState && backlightState == HIGH) {
-    backlightCount = !backlightCount;
+  if (backlightState != lastBacklightState && backlightState == HIGH) {   //if backlightState is HIGH
+    backlightCount = !backlightCount;   //make backlightCount TRUE
 
-    if (backlightCount == false) {
+    if (backlightCount == false) {     //if backlightCount is FALSE, make backlight button light and LEDs LOW
       digitalWrite(BACKLIGHT_BUTTON_LIGHT, LOW);
       digitalWrite(BACKLIGHT_LEDS, LOW);
     }
-    else {
+    else {     //if backlightCount is TRUE, make backlight button light and LEDs HIGH
       digitalWrite(BACKLIGHT_BUTTON_LIGHT, HIGH);
       digitalWrite(BACKLIGHT_LEDS, HIGH);
     }
@@ -158,15 +265,18 @@ void updateMotorState() {
     stepper.disableStepper();
   }
 
-  else if (motorState != lastMotorState && motorState == HIGH) {
-    motorCount = ! motorCount;
+  else if (motorState != lastMotorState && motorState == HIGH) {    //if motorState is HIGH      //motorState is whether motor button is turned on or off
+    motorCount = ! motorCount;     //make motorCount TRUE
 
-    if (motorCount == false) {
-      digitalWrite(MOTOR_BUTTON_LIGHT, LOW);
-      stepper.disableStepper();
+    if (motorCount == false) {     //if motorCount is FALSE, make motor button light LOW
+      turnOffMotor();
+      //delay(5000);
+      //turnOffBeam();
+      //beamState = LOW;
+      //beamCount = false;
     }
     else {
-      digitalWrite(MOTOR_BUTTON_LIGHT, HIGH);
+      digitalWrite(MOTOR_BUTTON_LIGHT, HIGH);    //if motorCount is TRUE, make motor button light HIGH
       stepper.resetVelocity();
       stepper.setTargetPositionRelativeInRevolutions(1000.0);
       stepper.enableStepper();
@@ -182,7 +292,11 @@ void updateMotorState() {
   //stepper.processMovement();
 }
 
-
+void turnOffMotor(){
+  digitalWrite(MOTOR_BUTTON_LIGHT, LOW);
+  stepper.disableStepper();
+  Serial.println("[debug] turnOffMotor() off");
+}
 
 void updateStepperMovement() {
   stepper.processMovement();
@@ -203,3 +317,10 @@ void filterPotVal() {  // allows the limitless potentiometer to work without "ov
 
   prevPotVal = newPotVal;
 }
+
+ /*
+void updateButtonPress() {
+  if (beamState == HIGH)
+    pressButton = true;
+}
+*/
