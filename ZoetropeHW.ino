@@ -61,7 +61,7 @@ int maxOutputVal = 100;
 int overflowThreshold = 1023 / 2;
 int filterThreshold = 3;
 
-//bool pressButton = false;
+bool pressButton = false;
 //int timer1_counter;
 
 unsigned long startTime;
@@ -108,11 +108,14 @@ void setup() {
 
   startTime = millis();
 
-  Timer1.initialize(TIMER_US);
-  Timer1.attachInterrupt(timerIsr);
+ // Timer1.initialize(TIMER_US);
+ // Timer1.attachInterrupt(timerIsr);
 }
 
 void loop() {
+  int startTime = 0;
+  int endTime = 0;
+  bool buttonPressed = false;
 
   ////////// Non-Latching Buttons require Button States /////////
   stepper.processMovement();
@@ -123,6 +126,28 @@ void loop() {
     updateMotorState();
     startTime = millis();
   }
+
+  if (beamState == HIGH)
+  {
+    startTime = millis();
+    endTime = startTime + 5000;
+    while (millis() < endTime)
+    {
+    //  bool lastBeamState1 = digitalRead(BEAM_BUTTON);
+    //  Serial.println(lastBeamState1);
+    //  delayMicroseconds(1);
+    // bool beamState1 = digitalRead(BEAM_BUTTON);
+    //  Serial.println(beamState1);
+    //  if (beamState1 != lastBeamState1)  {
+
+     //   break;
+     }
+     turnOffBeam();
+     beamState = LOW;
+     beamCount = false;
+  }
+
+//motorState isn't working
 
 /*
   if (motorCount == false) {
@@ -209,6 +234,7 @@ void tick_3s_isr()
 
 void updateBeamState() {
   beamState = !digitalRead(BEAM_BUTTON);  
+  pressButton = !pressButton;
 
   if (beamState != lastBeamState && beamState == HIGH) {   //if beamState is HIGH      //beamState is whether beam button is on or off
     beamCount = !beamCount;   //make beamCount TRUE
