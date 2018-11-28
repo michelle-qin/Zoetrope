@@ -63,14 +63,16 @@ int maxOutputVal = 100;
 int overflowThreshold = 1023 / 2;
 int filterThreshold = 3;
 
-int i = 0;
-int g = 0;
+
+//variables for keeping track of the current time in serial monitor//
+int i = 0;  //beam
+int g = 0;  //motor
 
 unsigned long startTime;
 
 FlexyStepper stepper;
 
-void setup() {    //issues: overlapping timers. turning off beam while motor is on. turning on beam - motor time stays the same, doesn't restart -- solution: turn on beam when motor is on; turn off beam when motor is off
+void setup() { 
   ////// Pinmode all ports ///////////
 
   Serial.begin(9600);
@@ -196,13 +198,13 @@ void tick_motor_isr()
 void updateBeamState() {
   beamState = !digitalRead(BEAM_BUTTON);
 
-  if (beamState != lastBeamState && beamState == HIGH) {   //if beamState is HIGH      //beamState is whether beam button is on or off
-    beamCount = !beamCount;   //make beamCount TRUE
-
-    if (beamCount == false) {      //if beamCount is FALSE, make beam button light & LEDs LOW
+  if (beamState != lastBeamState && beamState == HIGH) {     //beamState is whether beam button is on or off
+    beamCount = !beamCount;   //if beamState is HIGH, make beamCount TRUE
+ 
+    if (beamCount == false) {      
       turnOffBeam();
     }
-    else {    //if beamCount is TRUE, make beam button light & LEDs HIGH.
+    else {    
       turnOnBeam();
     }
   }
@@ -212,33 +214,34 @@ void updateBeamState() {
 }
 
 void turnOffBeam() {
-  //turns off beam light
+  //turn beam light off//
   digitalWrite(BEAM_BUTTON_LIGHT, LOW);
   digitalWrite(BEAM_LEDS, LOW);
   Serial.println("[debug] updateBeamState() off");
-  //stops timer
+  //stop timer//
   Timer1.stop();
     //Timer1.detachInterrupt();
   Serial.println("[debug] beam timer stops");
-  i = 0;
-  g = 0;
+  //reset timer//
+  i = 0;  //this restarts the print time in serial monitor for beam
+  g = 0;  //this restarts the print time in serial monitor for motor
   tick_count = TICK_COUNTS;  //this restarts the beam timer to TICK_COUNTS
   tick_count1 = TICK_COUNTS1;  //this restarts the motor timer to TICK_COUNTS1
 }
 void turnOnBeam () {
-  //turns on beam light
+  //turn beam light on//
   digitalWrite(BEAM_BUTTON_LIGHT, HIGH);
   digitalWrite(BEAM_LEDS, HIGH);
   Serial.println("[debug] updateBeamState() on");
-  //starts timer
-  Serial.println("[debug] beam timer starts");
-  tick_count = TICK_COUNTS;  //this restarts the beam timer to TICK_COUNTS
-  tick_count1 = TICK_COUNTS1;  //this restarts the motor timer to TICK_COUNTS1
+  //reset timers//
+  tick_count = TICK_COUNTS;  
+  tick_count1 = TICK_COUNTS1;  
   i = 0;
   g = 0;
+  //start timer//
+  Serial.println("[debug] beam timer starts");
   Timer1.initialize(TIMER_US);
   Timer1.attachInterrupt(timerIsr);
-//  Timer1.resume();
 }
 
 void updateBacklightState() {
@@ -270,10 +273,10 @@ void updateMotorState() {
     stepper.disableStepper();
   }
 
-  else if (motorState != lastMotorState && motorState == HIGH) {    //if motorState is HIGH      //motorState is whether motor button is turned on or off
+  else if (motorState != lastMotorState && motorState == HIGH) {    //motorState is whether motor button is turned on or off
     motorCount = !motorCount;     //make motorCount TRUE
 
-    if (motorCount == false) {     //if motorCount is FALSE, make motor button light LOW
+    if (motorCount == false) {    
       turnOffMotor();
     }
     else {
@@ -287,22 +290,23 @@ void updateMotorState() {
   }
   lastMotorState = motorState;
   lastPotVal = potVal;
-  //stepper.processMovement();
+    //stepper.processMovement();
 }
 
 void turnOffMotor() {
-  //turn motor off
+  //turn motor off//
   digitalWrite(MOTOR_BUTTON_LIGHT, LOW);
   stepper.disableStepper();
   Serial.println("[debug] turnOffMotor() off");
-  //stop timer
+  //stop timer//
   Timer3.stop();
   Serial.println("[debug] motor timer stops");
-  //resets encoder
+  //reset timers//
   g = 0;
   i = 0;
-  tick_count = TICK_COUNTS;  //this restarts the beam timer to TICK_COUNTS
-  tick_count1 = TICK_COUNTS1;  //this restarts the motor timer to TICK_COUNTS1
+  tick_count = TICK_COUNTS;  
+  tick_count1 = TICK_COUNTS1;  
+  //reset encoder//
   potVal = 0;
   lastPotVal = 0;
   prevPotVal = 0;
@@ -310,21 +314,21 @@ void turnOffMotor() {
 }
 
 void turnOnMotor() {
-  //turn on motor
+  //turn motor on//
   digitalWrite(MOTOR_BUTTON_LIGHT, HIGH);    //if motorCount is TRUE, make motor button light HIGH
   stepper.resetVelocity();
   stepper.setTargetPositionRelativeInRevolutions(1000.0);
   stepper.enableStepper();
   Serial.println("[debug] turnOnMotor() on");
-  //starts timer
-  Serial.println("[debug] motor timer starts");
+  //reset timers//
   tick_count = TICK_COUNTS;  //this restarts the beam timer to TICK_COUNTS
   tick_count1 = TICK_COUNTS1;  //this restarts the motor timer to TICK_COUNTS1
   i = 0;
   g = 0;
+  //start timers//
+  Serial.println("[debug] motor timer starts");
   Timer3.initialize(TIMER_US);
   Timer3.attachInterrupt(timerIsr1);
-//  Timer3.resume();
 }
 
 void updateStepperMovement() {
@@ -342,12 +346,13 @@ void filterPotVal() {  // allows the limitless potentiometer to work without "ov
   }
 
   else if (abs(newPotVal - prevPotVal) > filterThreshold) {
-    Serial.println("[debug] potentiometer2");
-    //resets timer
+    Serial.println("[debug] potentiometer");
+    //resets timers//
     tick_count = TICK_COUNTS;
     tick_count1 = TICK_COUNTS1;
     i = 0;
     g = 0;
+    
     if (newPotVal > prevPotVal)
       outputVal = min(outputVal + 1, maxOutputVal);
     else
