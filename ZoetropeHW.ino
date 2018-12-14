@@ -9,9 +9,9 @@
 #include <TimerThree.h>
 
 ////// Creating and assigning variables ///////////
-#define TIMER_US 100000
-#define TICK_COUNTS 100
-#define TICK_COUNTS1 300
+#define TIMER_US 100000    //original 100,000
+#define TICK_COUNTS 100     //original: 100
+#define TICK_COUNTS1 300    //original: 300
 
 volatile long tick_count = TICK_COUNTS;
 volatile long tick_count1 = TICK_COUNTS1;
@@ -35,11 +35,12 @@ volatile bool in_long_isr = false;
 // be careful when messing with these 4 varibles below because they've been tweaked to work with
 // the current set up. Changing them may result in loss of RPM or unusual noises.
 
-#define MICROSTEPPING 4
-#define TRANSMISSION 5
-#define BASE_STEPS_PER_REV 200
+#define MICROSTEPPING 4  //original: 4   //need to change hardware to be in sync
+#define TRANSMISSION 5  //5 revolutions on motor = 1 revolution of plate 
+#define BASE_STEPS_PER_REV 200  
 #define MIN_SPEED 0.2
-
+//#define MAX_SPEED 1.75
+#define MAX_SPEED 3
 bool beamState = LOW;
 bool lastBeamState = LOW;
 bool beamCount = false;
@@ -58,7 +59,7 @@ int lastPotVal = 0;
 int prevPotVal = analogRead(MOTOR_SPEED_POT);
 
 int outputVal = 0;
-int maxOutputVal = 100;
+int maxOutputVal = 80; //100
 
 int overflowThreshold = 1023 / 2;
 int filterThreshold = 3;
@@ -76,7 +77,7 @@ void setup() {
   ////// Pinmode all ports ///////////
 
   Serial.begin(9600);
-  Serial.println("[debug] setup()");   
+ // Serial.println("[debug] setup()");   
 
   pinMode(MOTOR_BUTTON_LIGHT, OUTPUT);
   pinMode(MOTOR_BUTTON, INPUT_PULLUP);
@@ -128,8 +129,8 @@ void loop() {
 
 void timerIsr()
 {
-  Serial.print("[debug] time for beam ");     //prints each 0.1 second, e.g. at "[debug] time 100", 10 seconds have passed. 
-  Serial.println(i);
+ //Serial.print("[debug] time for beam ");     //prints each 0.1 second, e.g. at "[debug] time 100", 10 seconds have passed. 
+ //Serial.println(i);
   i++;
 
   if (!(--tick_count))                             // Count to 10S
@@ -142,8 +143,8 @@ void timerIsr()
 
 void timerIsr1()
 {
-  Serial.print("[debug] time for motor ");     //prints each 0.1 second, e.g. at "[debug] time 100", 10 seconds have passed. 
-  Serial.println(g);
+ //Serial.print("[debug] time for motor ");     //prints each 0.1 second, e.g. at "[debug] time 100", 10 seconds have passed. 
+ //Serial.println(g);
   g++;
 
   if (!(--tick_count1))                             // Count to 30S
@@ -217,11 +218,11 @@ void turnOffBeam() {
   //turn beam light off//
   digitalWrite(BEAM_BUTTON_LIGHT, LOW);
   digitalWrite(BEAM_LEDS, LOW);
-  Serial.println("[debug] updateBeamState() off");
+ // Serial.println("[debug] updateBeamState() off");
   //stop timer//
   Timer1.stop();
     //Timer1.detachInterrupt();
-  Serial.println("[debug] beam timer stops");
+ // Serial.println("[debug] beam timer stops");
   //reset timer//
   i = 0;  //this restarts the print time in serial monitor for beam
   g = 0;  //this restarts the print time in serial monitor for motor
@@ -232,14 +233,14 @@ void turnOnBeam () {
   //turn beam light on//
   digitalWrite(BEAM_BUTTON_LIGHT, HIGH);
   digitalWrite(BEAM_LEDS, HIGH);
-  Serial.println("[debug] updateBeamState() on");
+ // Serial.println("[debug] updateBeamState() on");
   //reset timers//
   tick_count = TICK_COUNTS;  
   tick_count1 = TICK_COUNTS1;  
   i = 0;
   g = 0;
   //start timer//
-  Serial.println("[debug] beam timer starts");
+ // Serial.println("[debug] beam timer starts");
   Timer1.initialize(TIMER_US);
   Timer1.attachInterrupt(timerIsr);
 }
@@ -286,7 +287,12 @@ void updateMotorState() {
   }
 
   if (motorCount && potVal != lastPotVal) {
-    stepper.setSpeedInRevolutionsPerSecond(MIN_SPEED + (2 * (float)outputVal / 100.0));
+   // if ((MIN_SPEED + (2 * (float)outputVal / 120.0)) < MAX_SPEED)
+      
+    //  Serial.println(outputVal);
+    //  Serial.println((MIN_SPEED + (2 * (float)outputVal / 125.0)));
+      stepper.setSpeedInRevolutionsPerSecond(MIN_SPEED + (2 * (float)outputVal / 100.0));     //original was / 100.0
+    
   }
   lastMotorState = motorState;
   lastPotVal = potVal;
@@ -297,10 +303,10 @@ void turnOffMotor() {
   //turn motor off//
   digitalWrite(MOTOR_BUTTON_LIGHT, LOW);
   stepper.disableStepper();
-  Serial.println("[debug] turnOffMotor() off");
+ Serial.println("[debug] turnOffMotor() off");
   //stop timer//
   Timer3.stop();
-  Serial.println("[debug] motor timer stops");
+ // Serial.println("[debug] motor timer stops");
   //reset timers//
   g = 0;
   i = 0;
@@ -319,14 +325,14 @@ void turnOnMotor() {
   stepper.resetVelocity();
   stepper.setTargetPositionRelativeInRevolutions(1000.0);
   stepper.enableStepper();
-  Serial.println("[debug] turnOnMotor() on");
+ // Serial.println("[debug] turnOnMotor() on");
   //reset timers//
   tick_count = TICK_COUNTS;  //this restarts the beam timer to TICK_COUNTS
   tick_count1 = TICK_COUNTS1;  //this restarts the motor timer to TICK_COUNTS1
   i = 0;
   g = 0;
   //start timers//
-  Serial.println("[debug] motor timer starts");
+ // Serial.println("[debug] motor timer starts");
   Timer3.initialize(TIMER_US);
   Timer3.attachInterrupt(timerIsr1);
 }
@@ -340,13 +346,19 @@ void filterPotVal() {  // allows the limitless potentiometer to work without "ov
 
   if (abs(newPotVal - prevPotVal) > overflowThreshold) {
     if (prevPotVal > overflowThreshold)
+    {
       outputVal = min(outputVal + 1, maxOutputVal);
+    //  Serial.println("[debug] 1");
+    }
     else
+    {
       outputVal = max(outputVal - 1, 0);
+     // Serial.println("[debug] 2");
+    }
   }
 
   else if (abs(newPotVal - prevPotVal) > filterThreshold) {
-    Serial.println("[debug] potentiometer");
+ //   Serial.println("[debug] potentiometer");
     //resets timers//
     tick_count = TICK_COUNTS;
     tick_count1 = TICK_COUNTS1;
@@ -354,10 +366,17 @@ void filterPotVal() {  // allows the limitless potentiometer to work without "ov
     g = 0;
     
     if (newPotVal > prevPotVal)
+    {
       outputVal = min(outputVal + 1, maxOutputVal);
+      Serial.println("[debug]");
+      Serial.print(outputVal);
+    }
     else
+    {
       outputVal = max(outputVal - 1, 0);
-
+      Serial.println("[debug]");
+      Serial.print(outputVal);
+    }
     prevPotVal = newPotVal;
   }
 }
